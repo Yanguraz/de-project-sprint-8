@@ -70,40 +70,38 @@ def spark_init(spark_session_name) -> SparkSession:
 
 # Чтение и фильтрация кампаний ресторанов из Kafka
 def restaurant_read_stream(spark):
-    try:
-        df = spark.readStream.format('kafka').options(**kafka_security_options).option('subscribe', TOPIC_IN).load()
 
-        df_json = df.withColumn('key_str', F.col('key').cast(StringType())) \
-                    .withColumn('value_json', F.col('value').cast(StringType())) \
-                    .drop('key', 'value')
+    df = spark.readStream.format('kafka').options(**kafka_security_options).option('subscribe', TOPIC_IN).load()
 
-        incoming_message_schema = StructType([
-            StructField('restaurant_id', StringType(), nullable=True),
-            StructField('adv_campaign_id', StringType(), nullable=True),
-            StructField('adv_campaign_content', StringType(), nullable=True),
-            StructField('adv_campaign_owner', StringType(), nullable=True),
-            StructField('adv_campaign_owner_contact', StringType(), nullable=True),
-            StructField('adv_campaign_datetime_start', LongType(), nullable=True),
-            StructField('adv_campaign_datetime_end', LongType(), nullable=True),
-            StructField('datetime_created', LongType(), nullable=True),
-        ])
+    df_json = df.withColumn('key_str', F.col('key').cast(StringType())) \
+                .withColumn('value_json', F.col('value').cast(StringType())) \
+                .drop('key', 'value')
 
-        df_string = df_json.withColumn('value', F.from_json(F.col('value_json'), incoming_message_schema)).drop('value_json')
+    incoming_message_schema = StructType([
+        StructField('restaurant_id', StringType(), nullable=True),
+        StructField('adv_campaign_id', StringType(), nullable=True),
+        StructField('adv_campaign_content', StringType(), nullable=True),
+        StructField('adv_campaign_owner', StringType(), nullable=True),
+        StructField('adv_campaign_owner_contact', StringType(), nullable=True),
+        StructField('adv_campaign_datetime_start', LongType(), nullable=True),
+        StructField('adv_campaign_datetime_end', LongType(), nullable=True),
+        StructField('datetime_created', LongType(), nullable=True),
+    ])
 
-        df_filtered = df_string.select(
-            F.col('value.restaurant_id').alias('restaurant_id'),
-            F.col('value.adv_campaign_id').alias('adv_campaign_id'),
-            F.col('value.adv_campaign_content').alias('adv_campaign_content'),
-            F.col('value.adv_campaign_owner').alias('adv_campaign_owner'),
-            F.col('value.adv_campaign_owner_contact').alias('adv_campaign_owner_contact'),
-            F.col('value.adv_campaign_datetime_start').alias('adv_campaign_datetime_start'),
-            F.col('value.adv_campaign_datetime_end').alias('adv_campaign_datetime_end'),
-            F.col('value.datetime_created').alias('datetime_created')
-        ).filter((F.col('adv_campaign_datetime_start') <= current_timestamp_utc) & (F.col('adv_campaign_datetime_end') > current_timestamp_utc))
+    df_string = df_json.withColumn('value', F.from_json(F.col('value_json'), incoming_message_schema)).drop('value_json')
 
-        return df_filtered
-    except KafkaError as e:
-        print("Ошибка подключения к Kafka:", e)
+    df_filtered = df_string.select(
+        F.col('value.restaurant_id').alias('restaurant_id'),
+        F.col('value.adv_campaign_id').alias('adv_campaign_id'),
+        F.col('value.adv_campaign_content').alias('adv_campaign_content'),
+        F.col('value.adv_campaign_owner').alias('adv_campaign_owner'),
+        F.col('value.adv_campaign_owner_contact').alias('adv_campaign_owner_contact'),
+        F.col('value.adv_campaign_datetime_start').alias('adv_campaign_datetime_start'),
+        F.col('value.adv_campaign_datetime_end').alias('adv_campaign_datetime_end'),
+        F.col('value.datetime_created').alias('datetime_created')
+    ).filter((F.col('adv_campaign_datetime_start') <= current_timestamp_utc) & (F.col('adv_campaign_datetime_end') > current_timestamp_utc))
+
+    return df_filtered
 
 # Чтение подписчиков из PostgreSQL
 def subscribers_restaurants(spark):
