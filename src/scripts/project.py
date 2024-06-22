@@ -42,21 +42,21 @@ current_timestamp_utc = int(round(datetime.utcnow().timestamp() * 1000))
 
 # Функция для записи каждого батча в PostgreSQL и Kafka
 def foreach_batch_function(df, epoch_id):
-      df.persist()
+    df.persist()
 
-      # Добавление пустого столбца 'feedback'
-      feedback_df = df.withColumn('feedback', F.lit(None).cast(StringType()))
+    # Добавление пустого столбца 'feedback'
+    feedback_df = df.withColumn('feedback', F.lit(None).cast(StringType()))
 
-      # Запись в PostgreSQL
-      feedback_df.write.format('jdbc').mode('append').options(**docker_postgresql_settings).save()
+    # Запись в PostgreSQL
+    feedback_df.write.format('jdbc').mode('append').options(**docker_postgresql_settings).save()
 
-      # Сериализация для Kafka
-      df_to_stream = feedback_df.select(F.to_json(F.struct(F.col('*'))).alias('value')).select('value')
+    # Сериализация для Kafka
+    df_to_stream = feedback_df.select(F.to_json(F.struct(F.col('*'))).alias('value')).select('value')
 
-      # Запись в Kafka
-      df_to_stream.write.format('kafka').options(**kafka_security_options).option('topic', TOPIC_OUT).save()
+    # Запись в Kafka
+    df_to_stream.write.format('kafka').options(**kafka_security_options).option('topic', TOPIC_OUT).save()
 
-      df.unpersist()
+    df.unpersist()
 
 # Инициализация сессии Spark
 def spark_init(spark_session_name) -> SparkSession:
